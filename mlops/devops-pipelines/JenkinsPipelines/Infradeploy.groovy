@@ -16,7 +16,7 @@ pipeline {
 
     
     stage('CreateResourceGroup'){
-        def resource_group_name = 'rg-$(namespace)-$(postfix)-$(environment)'
+        def resource_group_name = 'rg-$namespace-$postfix-$environment'
         withCredentials([usernamePassword(credentialsId: 'MLOps-ServiceConnection', passwordVariable: 'AZURE_CLIENT_SECRET', usernameVariable: 'AZURE_CLIENT_ID')]) {
         sh '''
         az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
@@ -28,32 +28,62 @@ pipeline {
   
   
     stage('CreateAzureMLWorkspace') {
-    def  aml_workspace_name = 'mlw-$(namespace)-$(postfix)-$(environment)'
+    def  aml_workspace_name = 'mlw-$namespace-$postfix-$environment'
+    def resource_group_name = 'rg-$namespace-$postfix-$environment'
       // generate version, it's important to remove the trailing new line in git describe output
       withCredentials([usernamePassword(credentialsId: 'MLOps-ServiceConnection', passwordVariable: 'AZURE_CLIENT_SECRET', usernameVariable: 'AZURE_CLIENT_ID')]) {
         // login Azure
         sh '''
           az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
           az account set -s $AZURE_SUBSCRIPTION_ID
+
+       echo "Checking workspace" $aml_workspace_name 
+
+        # Create workspace
+        wkspcs=$(az ml workspace list -g  $resource_group_name --query [].display_name -o tsv )
+        ws_exists="false"
+
+        echo "found workspaces" $wkspcs
+
+        for ws in $wkspcs
+        do
+            if [[ $aml_workspace_name = $(echo $ws | tr -d '\r') ]]; then
+                ws_exists="true"
+                echo "Workspace $aml_workspace_name already exists"
+                break
+            fi
+        done
+
+        if [[ $ws_exists = "false" ]]; then
+            echo "Creating Workspace $aml_workspace_name $resource_group_name $location now .."
+            az ml workspace create --name $aml_workspace_name -g $resource_group_name -l $location
+        fi
         '''
-         // get login server
-        def acrSettingsJson = sh script: "az acr show -n $acrName", returnStdout: true
-        def loginServer = getAcrLoginServer acrSettingsJson
-        // login docker
-        // docker.withRegistry only supports credential ID, so use native docker command to login
-        // you can also use docker.withRegistry if you add a credential
-        sh "docker login -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET $loginServer"
-        // build image
-        def imageWithTag = "$loginServer/$imageName:$version"
-        def image = docker.build imageWithTag
-        // push image
-        image.push()
-        // update web app docker settings
-        sh "az webapp config container set -g $webAppResourceGroup -n $webAppName -c $imageWithTag -r http://$loginServer -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET"
-        // log out
-        sh 'az logout'
-        sh "docker logout $loginServer"
       }
+    }
+
+    stage('CreateMLCompute'){
+        def resource_group_name = 'rg-$namespace-$postfix-$environment'
+        withCredentials([usernamePassword(credentialsId: 'MLOps-ServiceConnection', passwordVariable: 'AZURE_CLIENT_SECRET', usernameVariable: 'AZURE_CLIENT_ID')]) {
+        sh '''
+        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
+        az account set -s $SubscriptionID
+	az configure --defaults group=$resource_group_name workspace=$aml_workspace_name
+        compute_name=$(az ml compute show -n $cluster_name --query name -o tsv)
+        if [[ -z "$compute_name" ]]
+        then
+          echo "Compute does not exists. Creating the cluster..."
+          az ml compute create --name $cluster_name --type amlcompute
+                                  --size $size \
+                                  --min-instances $min_instances \
+                                  --max-instances $max_instances \
+                                  --tier $cluster_tier
+        else
+          echo "Compute exists. Skipping cluster creation."
+          exit 0
+        fi
+        '''
+        }
     }
   }
 }
