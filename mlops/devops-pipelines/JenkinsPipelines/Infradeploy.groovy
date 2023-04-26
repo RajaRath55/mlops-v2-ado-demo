@@ -8,9 +8,6 @@ node {
         az extension list
         '''
         )
-    }   
-    stage('init') {
-      checkout scm
     }
     withCredentials([azureServicePrincipal(credentialsId: 'MLOps-Azure-Serviceprinciple',
     subscriptionIdVariable: 'SubscriptionID',
