@@ -64,12 +64,12 @@ node {
                     az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
                     az account set -s $AZURE_SUBSCRIPTION_ID
                     az configure --defaults group=rg-mlops-rajat-01-dev workspace='mlw-mlops-rajat-01-dev'
-                    $ENDPOINT_EXISTS=$(az ml online-endpoint list -o tsv --query "[?name=='taxi-fare-online-mlops-rajat-01-dev'][name]")
+                    $ENDPOINT_EXISTS=$(az ml online-endpoint list -o tsv --query "[?name=='taxi-fare-online-mlops-dev'][name]")
                     az ml online-endpoint list -o tsv
 
                     if($null -eq $ENDPOINT_EXISTS)
                     {
-                        az ml online-endpoint create --name 'taxi-fare-online-mlops-rajat-01-dev' -f 'mlops/azureml/deploy/online/online-endpoint.yml'
+                        az ml online-endpoint create --name 'taxi-fare-online-mlops-dev' -f 'mlops/azureml/deploy/online/online-endpoint.yml'
                     }
 
                     else
@@ -86,7 +86,7 @@ node {
                     az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
                     az account set -s $AZURE_SUBSCRIPTION_ID
                     az configure --defaults group=rg-mlops-rajat-01-dev workspace='mlw-mlops-rajat-01-dev'
-                    az ml online-deployment create --name 'taxi-online-dp' --endpoint 'taxi-fare-online-mlops-rajat-01-dev' -f 'mlops/azureml/deploy/online/online-deployment.yml'
+                    az ml online-deployment create --name 'taxi-online-dp' --endpoint 'taxi-fare-online-mlops-dev' -f 'mlops/azureml/deploy/online/online-deployment.yml'
                     '''
             )
         }
@@ -97,7 +97,7 @@ node {
                     az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
                     az account set -s $AZURE_SUBSCRIPTION_ID
                     az configure --defaults group=rg-mlops-rajat-01-dev workspace='mlw-mlops-rajat-01-dev'
-                    az ml online-endpoint update --name 'taxi-fare-online-mlops-rajat-01-dev' --traffic "taxi-online-dp=100"
+                    az ml online-endpoint update --name 'taxi-fare-online-mlops-dev' --traffic "taxi-online-dp=100"
                     '''
             )
         }
@@ -108,7 +108,7 @@ node {
                     az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
                     az account set -s $AZURE_SUBSCRIPTION_ID
                     az configure --defaults group=rg-mlops-rajat-01-dev workspace='mlw-mlops-rajat-01-dev'
-                    $RESPONSE=$(az ml online-endpoint invoke -n 'taxi-fare-online-mlops-rajat-01-dev' --deployment-name 'taxi-online-dp' --request-file 'data/taxi-request.json')
+                    $RESPONSE=$(az ml online-endpoint invoke -n 'taxi-fare-online-mlops-dev' --deployment-name 'taxi-online-dp' --request-file 'data/taxi-request.json')
                     Write-Host $RESPONSE
                     '''
             )
