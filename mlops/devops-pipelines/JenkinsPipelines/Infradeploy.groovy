@@ -9,6 +9,9 @@ node {
         '''
         )
     }
+    stage('init') {
+      checkout scm
+    }
     withCredentials([azureServicePrincipal(credentialsId: 'MLOps-Azure-Serviceprinciple',
     subscriptionIdVariable: 'SubscriptionID',
     clientIdVariable: 'AZURE_CLIENT_ID',
