@@ -1,89 +1,80 @@
-pipeline {
- withEnv(['AZURE_SUBSCRIPTION_ID=SubscriptionID',
-        'AZURE_TENANT_ID=TenantId']) {
-    stage('init') {
-      checkout scm
-    }
-
+node {
     stage('InstallAzureMLCLI'){
-        sh '''
+        powershell(
+        '''
         az version
         az extension add -n ml -y
         az extension update -n ml
         az extension list
         '''
+        )
     }
+    withCredentials([azureServicePrincipal(credentialsId: 'MLOps-Azure-Serviceprinciple',
+    subscriptionIdVariable: 'SubscriptionID',
+    clientIdVariable: 'AZURE_CLIENT_ID',
+    clientSecretVariable: 'AZURE_CLIENT_SECRET',
+    tenantIdVariable: 'Azure_TENANT_ID')]){
+        stage('CreateResourceGroup'){
 
-    
-    stage('CreateResourceGroup'){
-        def resource_group_name = 'rg-$namespace-$postfix-$environment'
-        withCredentials([usernamePassword(credentialsId: 'MLOps-ServiceConnection', passwordVariable: 'AZURE_CLIENT_SECRET', usernameVariable: 'AZURE_CLIENT_ID')]) {
-        sh '''
-        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
-        az account set -s $SubscriptionID
-        az group create --location $location --name $resource_group_name
-        '''
+            powershell( '''
+            az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% -t %Azure_TENANT_ID%
+            az account set -s %SubscriptionID%
+            az group create --location 'westeurope' --name 'rg-mlops-rajat-01-dev'
+            '''
+            )
+
         }
-    }
-  
-  
-    stage('CreateAzureMLWorkspace') {
-    def  aml_workspace_name = 'mlw-$namespace-$postfix-$environment'
-    def resource_group_name = 'rg-$namespace-$postfix-$environment'
-      // generate version, it's important to remove the trailing new line in git describe output
-      withCredentials([usernamePassword(credentialsId: 'MLOps-ServiceConnection', passwordVariable: 'AZURE_CLIENT_SECRET', usernameVariable: 'AZURE_CLIENT_ID')]) {
-        // login Azure
-        sh '''
-          az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $AZURE_TENANT_ID
-          az account set -s $AZURE_SUBSCRIPTION_ID
 
-       echo "Checking workspace" $aml_workspace_name 
-
-        # Create workspace
-        wkspcs=$(az ml workspace list -g  $resource_group_name --query [].display_name -o tsv )
-        ws_exists="false"
-
-        echo "found workspaces" $wkspcs
-
-        for ws in $wkspcs
-        do
-            if [[ $aml_workspace_name = $(echo $ws | tr -d '\r') ]]; then
-                ws_exists="true"
-                echo "Workspace $aml_workspace_name already exists"
+        stage('CreateAzureMLWorkspace') {
+            // login Azure
+            powershell(
+            '''
+            # az login --service-principal -u %AZURE_CLIENT_ID% -p %AZURE_CLIENT_SECRET% -t %Azure_TENANT_ID%
+            # az account set -s %AZURE_SUBSCRIPTION_ID%
+            Write-Host "Checking workspace mlw-mlops-rajat-01-dev" 
+            $wkspcs=$(az ml workspace list -g  'rg-mlops-rajat-01-dev' --query [].display_name -o tsv )
+            $ws_exists="false"
+            echo "found workspaces" $wkspcs
+            Foreach ($ws in $wkspcs)
+            {
+                if($ws -eq "mlw-mlops-rajat-01-dev")
+                {
+                $ws_exists="true"
+                echo "Workspace mlw-mlops-rajat-01-dev already exists"
                 break
-            fi
-        done
+                }
+                
+            }
 
-        if [[ $ws_exists = "false" ]]; then
-            echo "Creating Workspace $aml_workspace_name $resource_group_name $location now .."
-            az ml workspace create --name $aml_workspace_name -g $resource_group_name -l $location
-        fi
-        '''
-      }
-    }
+            if($ws_exists -eq "false")
+            {
+            Write-Host "Creating Workspace mlw-mlops-rajat-01-dev rg-mlops-rajat-01-dev westeurope now .."
+            az ml workspace create --name 'mlw-mlops-rajat-01-dev' -g 'rg-mlops-rajat-01-dev' -l 'westeurope'
+            break
+            }
+                '''
+            )
+        }
 
-    stage('CreateMLCompute'){
-        def resource_group_name = 'rg-$namespace-$postfix-$environment'
-        withCredentials([usernamePassword(credentialsId: 'MLOps-ServiceConnection', passwordVariable: 'AZURE_CLIENT_SECRET', usernameVariable: 'AZURE_CLIENT_ID')]) {
-        sh '''
-        az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
-        az account set -s $SubscriptionID
-	az configure --defaults group=$resource_group_name workspace=$aml_workspace_name
-        compute_name=$(az ml compute show -n $cluster_name --query name -o tsv)
-        if [[ -z "$compute_name" ]]
-        then
-          echo "Compute does not exists. Creating the cluster..."
-          az ml compute create --name $cluster_name --type amlcompute
-                                  --size $size \
-                                  --min-instances $min_instances \
-                                  --max-instances $max_instances \
-                                  --tier $cluster_tier
-        else
-          echo "Compute exists. Skipping cluster creation."
-          exit 0
-        fi
-        '''
+        stage('CreateMLCompute'){
+            powershell(
+            '''
+                    az login --service-principal -u $AZURE_CLIENT_ID -p $AZURE_CLIENT_SECRET -t $TenantId
+                    az account set -s $AZURE_SUBSCRIPTION_ID
+                    az configure --defaults group=rg-mlops-rajat-01-dev workspace='mlw-mlops-rajat-01-dev'
+                    $compute_name=$(az ml compute show -n 'cpu-cluster' --query name -o tsv)
+                    if ($null -eq $compute_name)
+                    {
+                        Write-Host "Compute does not exists. Creating the cluster..."
+                        az ml compute create --name 'cpu-cluster' --type amlcompute --size 'STANDARD_D2_V2' --min-instances 0 --max-instances 1 --tier dedicated
+                    }
+
+                    else
+                    {
+                        Write-Host "Compute exists. Skipping cluster creation."
+                    }
+                    '''
+            )
         }
     }
-  }
 }
