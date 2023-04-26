@@ -69,7 +69,7 @@ node {
 
                     if($null -eq $ENDPOINT_EXISTS)
                     {
-                        az ml $(endpoint_type)-endpoint create --name 'taxi-fare-online-mlops-rajat-01-dev' -f 'mlops/azureml/deploy/online/online-endpoint.yml'
+                        az ml online-endpoint create --name 'taxi-fare-online-mlops-rajat-01-dev' -f 'mlops/azureml/deploy/online/online-endpoint.yml'
                     }
 
                     else
