@@ -1,14 +1,12 @@
 // Jenkinsfile
 node {
-  def GITREPO         = "/var/lib/jenkins/workspace/${env.JOB_NAME}"
-  def GITREPOREMOTE   = "https://github.com/<repo>"
   def GITHUBCREDID    = "<github-token>"
   def CURRENTRELEASE  = "<release>"
   def DBTOKEN         = "<databricks-token>"
   def DBURL           = "https://<databricks-instance>"
-  def SCRIPTPATH      = "${GITREPO}/Automation/Deployments"
-  def NOTEBOOKPATH    = "${GITREPO}/Workspace"
-  def LIBRARYPATH     = "${GITREPO}/Libraries"
+  def SCRIPTPATH      = "}/Automation/Deployments"
+  def NOTEBOOKPATH    = "/Workspace"
+  def LIBRARYPATH     = "/Libraries"
   def BUILDPATH       = "${GITREPO}/Builds/${env.JOB_NAME}-${env.BUILD_NUMBER}"
   def OUTFILEPATH     = "${BUILDPATH}/Validation/Output"
   def TESTRESULTPATH  = "${BUILDPATH}/Validation/reports/junit"
@@ -38,8 +36,7 @@ node {
       }
   }
   stage('Checkout') { // for display purposes
-    echo "Pulling ${CURRENTRELEASE} Branch from Github"
-    git branch: CURRENTRELEASE, credentialsId: GITHUBCREDID, url: GITREPOREMOTE
+    checkout scm
   }
   stage('Run Unit Tests') {
     try {
