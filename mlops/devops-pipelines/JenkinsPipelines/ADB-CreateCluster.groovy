@@ -19,11 +19,6 @@ node {
   stage('CreateCluster') {
       withCredentials([string(credentialsId: DBTOKEN, variable: 'TOKEN')]) {
         sh """#!/bin/bash
-            # Configure Conda environment for deployment & testing
-            source ${CONDAPATH}/bin/activate ${CONDAENV}
-
-            # Configure Databricks CLI for deployment
-            echo "${DBURL}
             $TOKEN" | databricks configure --token
            databricks clusters create --json-file ADB/Clusters/computeengine.json
            """
